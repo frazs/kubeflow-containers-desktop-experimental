@@ -83,7 +83,6 @@ RUN /bin/bash $RESOURCES_PATH/tools/qgis.sh && \
 
 # From minimal-notebook-cpu. Partially redundant to r-notebook, kept for reference (conda ignores existing installs)
 # Excludes Elyra: needs troubleshooting
-# Excludes jupyter/lab git: needs troubleshooting
 RUN pip install --quiet --no-cache-dir \
       'jupyterlab-commenting-service' \
       'jupyter-lsp' \
@@ -98,6 +97,7 @@ RUN pip install --quiet --no-cache-dir \
       'ipympl' \
       'jupyter_contrib_nbextensions' \
       'jupyterlab-dash' \
+      'jupyterlab-git==0.20.0' \
       'xeus-python' \
       'nodejs' \
       'python-language-server' \
@@ -118,8 +118,10 @@ RUN pip install --quiet --no-cache-dir \
       '@hadim/jupyter-archive' \
       '@krassowski/jupyterlab-lsp' \
       '@lckr/jupyterlab_variableinspector' \
-      '@jupyterlab/debugger' \
       '@jupyterlab/commenting-extension' \
+      '@jupyterlab/debugger' \
+      '@jupyterlab/github' \
+      '@jupyterlab/git@0.20.0' \
       '@jupyterlab/toc' \
       'jupyter-matplotlib' \
       'jupyterlab-execute-time' \
