@@ -231,6 +231,24 @@ RUN echo '{ "@jupyterlab/apputils-extension:themes": {"theme": "JupyterLab Solar
 
 RUN pip --no-cache-dir install --quiet minio==5.0.10
 
+### Python testing
+
+RUN conda install -c conda-forge --quiet --yes \
+      'pylint' \
+      'pytest' \
+    && \
+    conda clean --all -f -y
+
+ARG SHA256py=62327bf119880f0ffe0a4ca3dc61371c73ed6a2481c79ab60b0163a3fd072128
+ARG VS_PYTHON_VERSION=2020.5.86806
+RUN rm -rf /tmp/home_nbuser_default/.vscode/extensions/ms-python.python-2020.6.91350 && \
+    wget --quiet --no-check-certificate https://github.com/microsoft/vscode-python/releases/download/$VS_PYTHON_VERSION/ms-python-release.vsix && \
+    #echo "${SHA256py} ms-python-release.vsix" | sha256sum -c - && \
+    bsdtar -xf ms-python-release.vsix extension && \
+    rm ms-python-release.vsix && \
+    mv extension /tmp/home_nbuser_default//.vscode/extensions/ms-python.python-$VS_PYTHON_VERSION
+
+
 ### Fixes a potential obscure permissions glitch
 
 RUN mv $HOME/.config $HOME/.config2 && \
