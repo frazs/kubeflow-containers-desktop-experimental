@@ -2,9 +2,6 @@ FROM k8scc01covidacr.azurecr.io/remote-desktop-test:vscode-hotfix-base
 
 USER root
 
-# To-do test/upstream: clean-layer modified to not delete /tmp/home_nbuser_desktop, which exists from the base image
-# COPY resources/clean-layer.sh clean-layer.sh
-
 # RStudio Server (In-Browser)
 ARG RSTUDIO_VERSION=1.1.463
 ARG SHA256=62aafd46f79705ca5db9c629ce3b60bf708d81c06a6b86cc4b417fbaf30691c1
@@ -82,7 +79,6 @@ RUN /bin/bash $RESOURCES_PATH/tools/qgis.sh && \
     rm -rf /var/lib/apt/lists
 
 # From minimal-notebook-cpu. Partially redundant to r-notebook, kept for reference (conda ignores existing installs)
-# Excludes Elyra: needs troubleshooting
 RUN pip install --quiet --no-cache-dir \
       'jupyterlab-commenting-service' \
       'jupyter-lsp' \
@@ -138,16 +134,6 @@ RUN pip install --quiet --no-cache-dir \
   fix-permissions.sh $CONDA_DIR && \
   fix-permissions.sh $HOME
 
-# SQLite drivers -- not included here, packages do not match.
-# The default /etc/odbcinst.ini file doesn't use full paths,
-# and it was causing R to fail to load the drivers.
-# RUN apt-get update && apt-get install -y \
-#     libsqlite3-dev \
-#     libsqliteodbc \
-#     && apt-get clean && rm -rf /var/lib/apt/lists/* && \
-#     sed -i 's~^\(Setup\|Driver\)=\([^/]*\)$~\1=/usr/lib/x86_64-linux-gnu/odbc/\2~' /etc/odbcinst.ini && \
-#     sed -i 's~libsqliteodbc.so~libsqlite3odbc.so~' /etc/odbcinst.ini 
-
 ARG KUBECTL_VERSION=v1.15.10
 ARG KUBECTL_URL=https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
 ARG KUBECTL_SHA=38a0f73464f1c39ca383fd43196f84bdbe6e553fe3e677b6e7012ef7ad5eaf2b
@@ -159,11 +145,7 @@ ARG MC_SHA=7198b0634f84c27e656bba527bf80ed048087e99afc7744e0fdd9e0790a726f5
 ARG AZCLI_URL=https://aka.ms/InstallAzureCLIDeb 
 ARG AZCLI_SHA=c03302f47be07d02afe3edec63080c7806980c51709c016af2f27901d51417b4
 
-# ARG PACHCTL_VERSION=1.10.5
-# ARG PACHCTL_URL=https://github.com/pachyderm/pachyderm/releases/download/v${PACHCTL_VERSION}/pachctl_${PACHCTL_VERSION}_amd64.deb 
-# ARG PACHCTL_SHA=8bc58206e87c3c4304a074c1479e08bdf173743dd6869d0ad4e792830a0df5c5
-
-# # kubectl, mc, az, pachctl
+# # kubectl, mc, az
 RUN curl -LO "${KUBECTL_URL}" \
     && echo "${KUBECTL_SHA} kubectl" | sha256sum -c - \
     && chmod +x ./kubectl \
@@ -177,57 +159,10 @@ RUN curl -LO "${KUBECTL_URL}" \
     curl -sLO https://aka.ms/InstallAzureCLIDeb \
     && echo "${AZCLI_SHA} InstallAzureCLIDeb" | sha256sum -c - \
     && bash InstallAzureCLIDeb
-#   && \
-#     curl -o /tmp/pachctl.deb -L "${PACHCTL_URL}" \
-#     && echo "${PACHCTL_SHA} /tmp/pachctl.deb" | sha256sum -c - \
-#     && sudo dpkg -i /tmp/pachctl.deb
 
 # Solarized Theme and Cell Execution Time
 RUN echo '{ "@jupyterlab/apputils-extension:themes": {"theme": "JupyterLab Solarized Dark"}, "@jupyterlab/notebook-extension:tracker": {"recordTiming": true}}' > /opt/conda/share/jupyter/lab/settings/overrides.json && \
     fix-permissions.sh /home/$NB_USER
-
-# # Go
-# ENV GOROOT=/usr/local/go
-# ENV PATH=$PATH:$GOROOT/bin
-# ENV GOPATH=/opt/go/
-
-# ARG GO_VERSION=1.14.4
-# ARG GO_URL=https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz
-# ARG GO_SHA=aed845e4185a0b2a3c3d5e1d0a35491702c55889192bb9c30e67a3de6849c067
-
-# RUN wget "${GO_URL}" -O /tmp/go.tar.gz && \
-#     echo "${GO_SHA} /tmp/go.tar.gz" | sha256sum -c - && \
-#     tar -xvf /tmp/go.tar.gz -C /usr/local && \
-#     printf "\nexport GOROOT=$GOROOT"             | tee -a /etc/profile && \
-#     printf "\nexport PATH=\$GOROOT/bin:\$PATH\n" | tee -a /etc/profile && \
-#     printf "\nexport GOPATH=$GOPATH\n"           | tee -a /etc/profile /home/$NB_USER/.bashrc && \
-#     printf "\nexport PATH=$GOPATH/bin:\$PATH\n"  | tee -a /etc/profile /home/$NB_USER/.bashrc
-# RUN mkdir -p $GOPATH && \
-#     env GO111MODULE=off go get -d -u github.com/gopherdata/gophernotes && \
-#     cd "$(go env GOPATH)"/src/github.com/gopherdata/gophernotes && \
-#     env GO111MODULE=on go install && \
-#     mkdir -p /opt/conda/share/jupyter/kernels/gophernotes && \
-#     cp kernel/* /opt/conda/share/jupyter/kernels/gophernotes && \
-#     cd /opt/conda/share/jupyter/kernels/gophernotes && \
-#     chmod +w ./kernel.json && \
-#     sed "s|gophernotes|$(go env GOPATH)/bin/gophernotes|" < kernel.json.in > kernel.json && \
-#     fix-permissions.sh /home/$NB_USER && \
-#     fix-permissions.sh $GOPATH
-
-# # From base-notebook, sans pytorch, tensorflow, dremio
-# RUN pip --no-cache-dir install --quiet \
-#       'kfp==1.0.0' \
-#       'kfp-server-api==1.0.0' \
-#       'kfp-tekton==0.2.0' \
-#       'kubeflow-fairing==1.0.1' \
-#       'kubeflow-metadata==0.3.1' \
-#       'minio==5.0.10' \
-#       'git+https://github.com/zachomedia/s3fs@8aa929f78666ff9e323cde7d9be9262db5a17985'
-
-# # kfp-azure-databricks needs to be run after kfp
-# RUN pip --no-cache-dir install --quiet \
-#       'fire==0.3.1' \
-#       'git+https://github.com/kubeflow/pipelines@1d86111d8f152d3ed7506ea59cee1bfbc28abbf9#egg=kfp-azure-databricks&subdirectory=samples/contrib/azure-samples/kfp-azure-databricks'
 
 RUN pip --no-cache-dir install --quiet minio==5.0.10
 
@@ -249,6 +184,186 @@ RUN rm -rf /tmp/home_nbuser_default/.vscode/extensions/ms-python.python-2020.6.9
     mv extension /tmp/home_nbuser_default//.vscode/extensions/ms-python.python-$VS_PYTHON_VERSION
 
 
+### CUDA Test 1: ml-workspace GPU flavor REF https://github.com/ml-tooling/ml-workspace/blob/master/gpu-flavor/Dockerfile
+### NVIDIA CUDA BASE ###
+# https://gitlab.com/nvidia/container-images/cuda/blob/ubuntu18.04/10.1/base/Dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg2 curl ca-certificates && \
+    curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - && \
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
+    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
+    # Cleanup - cannot use cleanup script here, otherwise too much is removed
+    apt-get clean && \ 
+    rm -rf $HOME/.cache/* && \
+    rm -rf /tmp/* && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV CUDA_VERSION 10.1.168
+ENV CUDA_PKG_VERSION 10-1=$CUDA_VERSION-1
+
+# For libraries in the cuda-compat-* package: https://docs.nvidia.com/cuda/eula/index.html#attachment-a
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cuda-cudart-$CUDA_PKG_VERSION \
+        cuda-compat-10-1 && \
+    ln -s cuda-10.1 /usr/local/cuda && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Cleanup - cannot use cleanup script here, otherwise too much is removed
+    apt-get clean && \ 
+    rm -rf $HOME/.cache/* && \
+    rm -rf /tmp/* && \
+    rm -rf /var/lib/apt/lists/*
+
+# Required for nvidia-docker v1
+RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
+    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
+
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+
+# nvidia-container-runtime
+# https://github.com/NVIDIA/nvidia-container-runtime#environment-variables-oci-spec
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+ENV NVIDIA_REQUIRE_CUDA "cuda>=10.1 brand=tesla,driver>=384,driver<385 brand=tesla,driver>=396,driver<397 brand=tesla,driver>=410,driver<411"
+
+### CUDA RUNTIME ###
+# https://gitlab.com/nvidia/container-images/cuda/blob/ubuntu18.04/10.1/runtime/Dockerfile
+
+ENV NCCL_VERSION 2.4.2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cuda-libraries-$CUDA_PKG_VERSION \
+        cuda-nvtx-$CUDA_PKG_VERSION \
+        libnccl2=$NCCL_VERSION-1+cuda10.1 && \
+    apt-mark hold libnccl2 && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Cleanup - cannot use cleanup script here, otherwise too much is removed
+    apt-get clean && \ 
+    rm -rf $HOME/.cache/* && \
+    rm -rf /tmp/* && \
+    rm -rf /var/lib/apt/lists/*
+
+### END CUDA RUNTIME ###
+
+### CUDA DEVEL ###
+# https://gitlab.com/nvidia/container-images/cuda/blob/ubuntu18.04/10.1/devel/Dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cuda-libraries-dev-$CUDA_PKG_VERSION \
+        cuda-nvml-dev-$CUDA_PKG_VERSION \
+        cuda-minimal-build-$CUDA_PKG_VERSION \
+        cuda-command-line-tools-$CUDA_PKG_VERSION \
+        libnccl-dev=$NCCL_VERSION-1+cuda10.1 && \
+    rm -rf /var/lib/apt/lists/* && \ 
+    # Cleanup - cannot use cleanup script here, otherwise too much is removed
+    apt-get clean && \ 
+    rm -rf /root/.cache/* && \
+    rm -rf /tmp/* && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs
+
+### END CUDA DEVEL ###
+
+### CUDANN7 DEVEL ###
+# https://gitlab.com/nvidia/container-images/cuda/blob/ubuntu18.04/10.1/devel/cudnn7/Dockerfile
+
+ENV CUDNN_VERSION 7.6.0.64
+LABEL com.nvidia.cudnn.version="${CUDNN_VERSION}"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+            libcudnn7=$CUDNN_VERSION-1+cuda10.1 \
+            libcudnn7-dev=$CUDNN_VERSION-1+cuda10.1 && \
+    apt-mark hold libcudnn7 && \
+    rm -rf /var/lib/apt/lists/* && \ 
+    # Cleanup
+    apt-get clean && \ 
+    rm -rf /root/.cache/* && \
+    rm -rf /tmp/* && \
+    rm -rf /var/lib/apt/lists/*
+
+### END CUDANN7 ###
+
+# Link Cupti:
+ENV LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/usr/local/cuda/extras/CUPTI/lib64
+
+# Install TensorRT. Requires that libcudnn7 is installed above.
+# https://www.tensorflow.org/install/gpu#ubuntu_1804_cuda_101
+RUN apt-get update && apt-get install -y --no-install-recommends libnvinfer6=6.0.1-1+cuda10.1 \
+    libnvinfer-dev=6.0.1-1+cuda10.1 \
+    libnvinfer-plugin6=6.0.1-1+cuda10.1 && \
+    # Cleanup
+    clean-layer.sh
+
+## GPU DATA SCIENCE LIBRARIES ###
+
+RUN \
+    apt-get update && \
+    apt-get install -y libomp-dev libopenblas-base && \
+    # Not needed? Install cuda-toolkit (e.g. for pytorch: https://pytorch.org/): https://anaconda.org/anaconda/cudatoolkit
+    conda install -y cudatoolkit=10.1 -c pytorch && \
+    # Install cupy: https://cupy.chainer.org/
+    pip install --no-cache-dir cupy-cuda101 && \
+    # Install pycuda: https://pypi.org/project/pycuda
+    pip install --no-cache-dir pycuda && \
+    # Install gpu utils libs
+    pip install --no-cache-dir gpustat py3nvml gputil && \
+    # Install scikit-cuda: https://scikit-cuda.readthedocs.io/en/latest/install.html
+    pip install --no-cache-dir scikit-cuda && \
+    # Install tensorflow gpu - conda uninstall removes too much and conda remove corrupts environment
+    # only tensorflow 2.1 supports cuda 10.1
+    pip uninstall -y tensorflow && \
+    pip install --no-cache-dir tensorflow-gpu==2.1.0 && \
+    # Install ONNX GPU Runtime
+    pip uninstall -y onnxruntime && \
+    pip install --no-cache-dir onnxruntime-gpu==1.1.1 && \
+    # Install pytorch gpu
+    # https://pytorch.org/get-started/locally/
+    conda install -y pytorch torchvision -c pytorch && \
+    # Update mxnet to gpu edition
+    pip uninstall -y mxnet-mkl && \
+    pip install --no-cache-dir mxnet-cu101mkl==1.5.1.post0 && \
+    # install jax: https://github.com/google/jax#pip-installation
+    pip install --no-cache-dir --upgrade jax https://storage.googleapis.com/jax-releases/cuda101/jaxlib-0.1.37-cp37-none-linux_x86_64.whl && \
+    # Install pygpu - Required for theano: http://deeplearning.net/software/libgpuarray/
+    conda install -y pygpu && \
+    # nvidia python ml lib
+    pip install --upgrade --force-reinstall nvidia-ml-py3 && \ 
+    # SpeedTorch: https://github.com/Santosh-Gupta/SpeedTorch
+    pip install --no-cache-dir SpeedTorch && \ 
+    # Cleanup
+    # Cleanup python bytecode files - not needed: https://jcrist.github.io/conda-docker-tips.html
+    find ${CONDA_DIR} -type f -name '*.pyc' -delete && \
+    find ${CONDA_DIR} -type l -name '*.pyc' -delete && \
+    clean-layer.sh
+
+# https://www.anaconda.com/getting-started-with-gpu-computing-in-anaconda/
+
+# By default, the majority of GPU memory will be allocated by the first
+# execution of a TensorFlow graph. While this behavior can be desirable for
+# production pipelines, it is less desirable for interactive use. Set
+# TF_FORCE_GPU_ALLOW_GROWTH to change this default behavior as if the user had
+ENV TF_FORCE_GPU_ALLOW_GROWTH true
+
+### END DATA SCIENCE LIBRARIES ###
+
+### GPU TOOLS ###
+
+# Install Glances & Netdata GPU Support
+RUN \
+    apt-get update -y && \
+    apt-get install lm-sensors -y && \
+    apt-get install netcat -y && \
+    apt-get install iproute2 -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    git clone https://github.com/Splo0sh/netdata_nv_plugin --depth 1 /tmp/netdata_nv_plugin && \
+    cp /tmp/netdata_nv_plugin/nv.chart.py /usr/libexec/netdata/python.d/ && \
+    cp /tmp/netdata_nv_plugin/python_modules/pynvml.py /usr/libexec/netdata/python.d/python_modules/ && \
+    cp /tmp/netdata_nv_plugin/nv.conf /etc/netdata/python.d/ && \
+    # Cleanup
+    clean-layer.sh
+
+## END GPU TOOLS ###
+
 ### Fixes a potential obscure permissions glitch
 
 RUN mv $HOME/.config $HOME/.config2 && \
@@ -257,7 +372,7 @@ RUN mv $HOME/.config $HOME/.config2 && \
 
 ## Workspace overwrite hotfix
 
-RUN cp -r $HOME /tmp/home_nbuser_default && \
+RUN cp -r --no-clobber $HOME /tmp/home_nbuser_default && \
     chown -R $NB_USER /tmp/home_nbuser_default
 
 ## Landing page
